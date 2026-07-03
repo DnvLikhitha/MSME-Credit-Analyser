@@ -30,10 +30,10 @@ async def lifespan(app: FastAPI):
     """
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.REPORTS_DIR, exist_ok=True)
-    print(f"✅  MSME Credit Intelligence API — {settings.APP_ENV} | {settings.APP_HOST}:{settings.APP_PORT}")
-    print(f"✅  Supabase: {settings.SUPABASE_URL or 'not configured'}")
+    print(f"[*] MSME Credit Intelligence API - {settings.APP_ENV} | {settings.APP_HOST}:{settings.APP_PORT}")
+    print(f"[*] Supabase: {settings.SUPABASE_URL or 'not configured'}")
     yield
-    print("🛑  Application shutting down")
+    print("[!] Application shutting down")
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
