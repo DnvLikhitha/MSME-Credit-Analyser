@@ -1,0 +1,77 @@
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.cover
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# ===========================
+# Environment & Secrets
+# ===========================
+.env
+.env.local
+.env.*.local
+
+# ===========================
+# Uploads & Generated Files
+# ===========================
+uploads/
+reports/
+*.pdf
+
+# ===========================
+# Node / Frontend
+# ===========================
+node_modules/
+.next/
+.nuxt/
+dist/
+.cache/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===========================
+# Docker
+# ===========================
+*.override.yml
+
+# ===========================
+# Databases & Vector Stores
+# ===========================
+chroma_db/
+*.db
+*.sqlite3
+
+# ===========================
+# OS artifacts
+# ===========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===========================
+# IDE
+# ===========================
+.vscode/
+.idea/
+*.swp
+*.swo
