@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Column, DateTime, Float, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -52,7 +52,7 @@ class ExtractedMetrics(Base):
     cheque_bounce_count = Column(Float, nullable=True)      # red flag metric
 
     # ── Raw Extraction ───────────────────────────────────────────────────────
-    raw_extraction_json = Column(JSONB, nullable=True)      # full LLM output
+    raw_extraction_json = Column(JSON, nullable=True)      # full LLM output
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

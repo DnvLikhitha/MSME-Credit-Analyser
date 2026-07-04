@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Text, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -38,7 +38,7 @@ class RiskScore(Base):
     # ── Explainability ────────────────────────────────────────────────────────
     # List of factor dicts:
     # [{"factor": "Revenue Growth", "score": 18, "max": 20, "explanation": "..."}]
-    factor_breakdown = Column(JSONB, nullable=True)
+    factor_breakdown = Column(JSON, nullable=True)
 
     # LLM-generated narrative (optional, can be disabled to save API credits)
     narrative_summary = Column(Text, nullable=True)

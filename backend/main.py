@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.database import engine
+from backend.utils.rabbitmq import connect_rabbitmq, close_rabbitmq
 
 # Import models so SQLAlchemy mapper knows about them (needed for ORM queries)
 from backend.models import (  # noqa: F401
@@ -30,9 +31,16 @@ async def lifespan(app: FastAPI):
     """
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.REPORTS_DIR, exist_ok=True)
+    
+    # Initialize RabbitMQ Publisher Connection
+    await connect_rabbitmq()
+    
     print(f"[*] MSME Credit Intelligence API - {settings.APP_ENV} | {settings.APP_HOST}:{settings.APP_PORT}")
     print(f"[*] Supabase: {settings.SUPABASE_URL or 'not configured'}")
     yield
+    
+    # Cleanup resources
+    await close_rabbitmq()
     print("[!] Application shutting down")
 
 

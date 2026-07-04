@@ -12,6 +12,7 @@ from backend.models.document import Document, DocumentStatus, DocumentType
 from backend.models.user import User
 from backend.routers.auth import get_current_user
 from backend.schemas.document import DocumentListResponse, DocumentResponse, UploadResponse
+from backend.utils.rabbitmq import publish_document_processing_task
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -116,8 +117,8 @@ async def upload_document(
     db.commit()
     db.refresh(document)
 
-    # TODO (Phase 2): enqueue extraction job to RabbitMQ here
-    # await enqueue_extraction_job(str(document.id))
+    # Publish task to RabbitMQ for async processing
+    await publish_document_processing_task(str(document.id))
 
     return UploadResponse(
         document=document,

@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -35,7 +35,7 @@ class LoanRecommendation(Base):
 
     # ── Scheme Details ────────────────────────────────────────────────────────
     # {"max_loan_amount": 500000, "interest_rate": "7-8%", "tenure": "5 years", ...}
-    scheme_details = Column(JSONB, nullable=True)
+    scheme_details = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
