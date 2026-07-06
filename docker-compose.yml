@@ -14,5 +14,20 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     restart: unless-stopped
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: msme_postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: msme
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - msme_postgres_data_v3:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
+  msme_postgres_data_v3:

@@ -20,9 +20,9 @@ async def connect_rabbitmq():
         _channel = await _connection.channel()
         # Declare the queue so it exists before we publish
         await _channel.declare_queue(DOCUMENT_PROCESSING_QUEUE, durable=True)
-        print(f"✅  Connected to RabbitMQ at {settings.RABBITMQ_URL}")
+        print(f"[*] Connected to RabbitMQ at {settings.RABBITMQ_URL}")
     except Exception as e:
-        print(f"⚠️  Failed to connect to RabbitMQ: {e}")
+        print(f"[!] Failed to connect to RabbitMQ: {e}")
 
 
 async def close_rabbitmq():
@@ -30,14 +30,14 @@ async def close_rabbitmq():
     global _connection
     if _connection:
         await _connection.close()
-        print("🛑  Closed RabbitMQ connection")
+        print("[*] Closed RabbitMQ connection")
 
 
 async def publish_document_processing_task(document_id: str):
     """Publish a document ID to the processing queue."""
     global _channel
     if not _channel:
-        print("⚠️  RabbitMQ channel not initialized. Cannot publish message.")
+        print("[!] RabbitMQ channel not initialized. Cannot publish message.")
         return False
 
     message_body = json.dumps({"document_id": str(document_id)}).encode()
@@ -53,5 +53,5 @@ async def publish_document_processing_task(document_id: str):
         )
         return True
     except Exception as e:
-        print(f"⚠️  Failed to publish task to RabbitMQ: {e}")
+        print(f"[!] Failed to publish task to RabbitMQ: {e}")
         return False

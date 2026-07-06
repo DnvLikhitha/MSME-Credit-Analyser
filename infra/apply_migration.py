@@ -17,32 +17,21 @@ with open(migration_file, "r") as f:
 
 print(f"Applying migration: {migration_file}")
 
-# Split on semicolons but ignore comment-only lines
-statements = []
-for stmt in sql.split(";"):
-    stmt = stmt.strip()
-    # Filter out empty statements and pure-comment blocks
-    non_comment = "\n".join(
-        line for line in stmt.splitlines() if not line.strip().startswith("--")
-    ).strip()
-    if non_comment:
-        statements.append(stmt)
-
 errors = []
 with engine.connect() as conn:
-    for i, stmt in enumerate(statements, 1):
-        try:
-            conn.execute(sqlalchemy.text(stmt))
-        except Exception as e:
-            errors.append(f"  Statement {i}: {e}")
-    conn.commit()
+    try:
+        conn.execute(sqlalchemy.text(sql))
+        conn.commit()
+    except Exception as e:
+        errors.append(str(e))
+        conn.rollback()
 
 if errors:
-    print("⚠️  Some statements had warnings (likely already exists):")
+    print("[!] Error applying migration:")
     for e in errors:
         print(e)
 else:
-    print("✅  All statements applied cleanly.")
+    print("[*] All statements applied cleanly.")
 
 # Verify
 with engine.connect() as conn:
@@ -51,6 +40,6 @@ with engine.connect() as conn:
     ))
     tables = [row[0] for row in result]
 
-print(f"\n📋  Tables in Supabase ({len(tables)}):")
+print(f"\n[*] Tables in Database ({len(tables)}):")
 for t in tables:
-    print(f"  ✓ {t}")
+    print(f"  - {t}")
