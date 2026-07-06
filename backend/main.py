@@ -17,7 +17,7 @@ from backend.models import (  # noqa: F401
     RiskScore,
     User,
 )
-from backend.routers import auth, upload
+from backend.routers import auth, upload, scoring
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
@@ -73,6 +73,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(upload.router)
+app.include_router(scoring.router)
 
 
 # ── Health Endpoints ──────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ def root():
         "status": "ok",
         "service": "MSME Credit Intelligence API",
         "version": "1.0.0",
-        "phase": "1 — Scaffold + Upload API",
+        "phase": "3 — Credit Risk Scoring",
         "docs": "/docs",
     }
 

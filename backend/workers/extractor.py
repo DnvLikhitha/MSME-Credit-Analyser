@@ -16,6 +16,7 @@ from backend.config import settings
 from backend.database import SessionLocal
 from backend.models.document import Document
 from backend.models.extracted_metrics import ExtractedMetrics
+from backend.services.scoring import save_risk_score
 from backend.utils.gemini import extract_financial_metrics_from_text
 from backend.utils.rabbitmq import DOCUMENT_PROCESSING_QUEUE
 
@@ -85,19 +86,28 @@ async def process_document(message: aio_pika.IncomingMessage):
                     logger.info(f"Extracted {len(text)} characters. Sending to Gemini...")
                     extracted_data_dict = await extract_financial_metrics_from_text(text)
                     
-                    # 3. Save to database
+                    # 3. Save extracted metrics to database
                     metrics = ExtractedMetrics(
                         document_id=doc.id,
                         raw_extraction_json=extracted_data_dict,
                         **extracted_data_dict
                     )
                     db.add(metrics)
-                    
-                    # 4. Update status to SCORING (triggers Phase 3 next)
                     doc.status = "SCORING"
                     db.commit()
-                    
-                    logger.info(f"Successfully processed document {document_id}")
+                    db.refresh(metrics)
+
+                    logger.info(f"Extraction complete for {document_id}. Running risk scoring...")
+
+                    # 4. Phase 3 — Run risk scoring immediately
+                    risk_score = save_risk_score(db, doc.id, metrics)
+                    doc.status = "COMPLETE"
+                    db.commit()
+
+                    logger.info(
+                        f"Scoring complete for {document_id}: "
+                        f"{risk_score.overall_score}/100 [{risk_score.risk_band}]"
+                    )
                     
                 except Exception as e:
                     logger.error(f"Failed processing document {document_id}: {e}")
