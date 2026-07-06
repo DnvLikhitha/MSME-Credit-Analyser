@@ -16,6 +16,7 @@ from backend.config import settings
 from backend.database import SessionLocal
 from backend.models.document import Document
 from backend.models.extracted_metrics import ExtractedMetrics
+from backend.services.recommendation import generate_and_save_recommendations
 from backend.services.scoring import save_risk_score
 from backend.utils.gemini import extract_financial_metrics_from_text
 from backend.utils.rabbitmq import DOCUMENT_PROCESSING_QUEUE
@@ -101,13 +102,22 @@ async def process_document(message: aio_pika.IncomingMessage):
 
                     # 4. Phase 3 — Run risk scoring immediately
                     risk_score = save_risk_score(db, doc.id, metrics)
-                    doc.status = "COMPLETE"
-                    db.commit()
-
                     logger.info(
                         f"Scoring complete for {document_id}: "
                         f"{risk_score.overall_score}/100 [{risk_score.risk_band}]"
                     )
+
+                    doc.status = "RECOMMENDING"
+                    db.commit()
+
+                    # 5. Phase 4 — Run loan scheme matching immediately
+                    logger.info(f"Running loan scheme recommendations for {document_id}...")
+                    # Note: worker is already in an async context, so we can await the recommendation service
+                    await generate_and_save_recommendations(db, doc.id, metrics, risk_score)
+                    
+                    doc.status = "COMPLETE"
+                    db.commit()
+                    logger.info(f"Recommendations complete for {document_id}. Pipeline finished successfully.")
                     
                 except Exception as e:
                     logger.error(f"Failed processing document {document_id}: {e}")
