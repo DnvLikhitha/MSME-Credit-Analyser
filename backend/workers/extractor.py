@@ -17,6 +17,7 @@ from backend.database import SessionLocal
 from backend.models.document import Document
 from backend.models.extracted_metrics import ExtractedMetrics
 from backend.services.recommendation import generate_and_save_recommendations
+from backend.services.report import generate_and_save_report
 from backend.services.scoring import save_risk_score
 from backend.utils.gemini import extract_financial_metrics_from_text
 from backend.utils.rabbitmq import DOCUMENT_PROCESSING_QUEUE
@@ -112,12 +113,18 @@ async def process_document(message: aio_pika.IncomingMessage):
 
                     # 5. Phase 4 — Run loan scheme matching immediately
                     logger.info(f"Running loan scheme recommendations for {document_id}...")
-                    # Note: worker is already in an async context, so we can await the recommendation service
-                    await generate_and_save_recommendations(db, doc.id, metrics, risk_score)
-                    
+                    recs = await generate_and_save_recommendations(db, doc.id, metrics, risk_score)
+
+                    doc.status = "REPORTING"
+                    db.commit()
+
+                    # 6. Phase 5 — Generate PDF credit report
+                    logger.info(f"Generating PDF report for {document_id}...")
+                    generate_and_save_report(db, doc, metrics, risk_score, recs)
+
                     doc.status = "COMPLETE"
                     db.commit()
-                    logger.info(f"Recommendations complete for {document_id}. Pipeline finished successfully.")
+                    logger.info(f"Pipeline complete for {document_id}. Upload -> Extract -> Score -> Recommend -> Report. Done!")
                     
                 except Exception as e:
                     logger.error(f"Failed processing document {document_id}: {e}")
