@@ -1,0 +1,48 @@
+.upload-main { padding: 40px 0 80px; }
+.upload-header { margin-bottom: 32px; }
+.upload-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 768px) { .upload-layout { grid-template-columns: 1fr; } }
+
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--r-lg);
+  min-height: 320px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s;
+  background: rgba(13,27,46,0.4);
+}
+.drop-zone:hover, .drop-zone.dragging {
+  border-color: var(--blue);
+  background: rgba(26,115,232,0.05);
+}
+.drop-zone.has-file { border-style: solid; border-color: var(--blue); }
+
+.drop-icon { font-size: 52px; margin-bottom: 12px; color: var(--text-muted); }
+.drop-prompt { text-align: center; padding: 24px; }
+.drop-text { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.drop-sub  { font-size: 13px; color: var(--text-muted); }
+
+.file-preview {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px;
+}
+.file-icon { font-size: 52px; }
+.file-name  { font-size: 14px; font-weight: 600; color: var(--text); text-align: center; }
+.file-size  { font-size: 12px; color: var(--text-muted); }
+
+.upload-config { display: flex; flex-direction: column; gap: 16px; }
+.config-title  { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.type-option {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 10px 12px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); margin-top: 6px; font-size: 13.5px;
+  transition: all 0.15s;
+}
+.type-option.selected {
+  border-color: var(--blue); background: rgba(26,115,232,0.1); color: var(--blue-light);
+}
+.type-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid currentColor; flex-shrink: 0;
+}
+.type-option.selected .type-dot { background: var(--blue); border-color: var(--blue); }
+.upload-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; }

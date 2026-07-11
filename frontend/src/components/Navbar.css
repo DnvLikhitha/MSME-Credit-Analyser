@@ -1,0 +1,37 @@
+.navbar {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(6, 13, 26, 0.85);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  height: 60px;
+}
+.navbar-inner {
+  display: flex; align-items: center; gap: 24px; height: 100%;
+}
+.navbar-brand {
+  display: flex; align-items: center; gap: 8px;
+  text-decoration: none; flex-shrink: 0;
+}
+.brand-icon {
+  font-size: 22px; color: var(--blue); line-height: 1;
+  filter: drop-shadow(0 0 8px var(--blue-glow));
+}
+.brand-text { font-size: 16px; font-weight: 700; color: var(--text); }
+.brand-accent { color: var(--blue-light); }
+
+.navbar-links {
+  display: flex; gap: 4px; flex: 1; justify-content: center;
+}
+.nav-link {
+  font-size: 13.5px; font-weight: 500; color: var(--text-muted);
+  text-decoration: none; padding: 6px 14px; border-radius: var(--r-sm);
+  transition: all 0.15s;
+}
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-link.active { color: var(--blue-light); background: rgba(26,115,232,0.1); }
+
+.navbar-right { display: flex; align-items: center; gap: 12px; }
+.user-pill {
+  font-size: 13px; font-weight: 600; color: var(--text-muted);
+  background: var(--surface2); padding: 4px 12px; border-radius: 100px;
+}
