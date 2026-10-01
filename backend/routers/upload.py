@@ -50,6 +50,10 @@ async def upload_document(
         default=DocumentType.OTHER,
         description="GST_RETURN | BANK_STATEMENT | ITR | OTHER",
     ),
+    pdf_password: Optional[str] = Form(
+        default=None,
+        description="Password to decrypt a password-protected PDF (bank statements, etc.)",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -85,7 +89,7 @@ async def upload_document(
     content_hash = compute_sha256(content)
     existing = find_existing_document(db, current_user.id, content_hash)
 
-    if existing:
+    if existing and existing.status != "FAILED":
         return UploadResponse(
             document=existing,
             is_duplicate=True,
@@ -112,6 +116,7 @@ async def upload_document(
         document_type=document_type,
         content_hash=content_hash,
         status=DocumentStatus.PENDING,
+        pdf_password=pdf_password or None,  # stored temporarily; cleared after extraction
     )
     db.add(document)
     db.commit()

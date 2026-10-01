@@ -66,22 +66,30 @@ async def extract_financial_metrics_from_text(text: str) -> dict:
         )
     )
 
-    try:
-        response = await model.generate_content_async(
-            text,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                response_schema=_build_response_schema(),
-                temperature=0.1,
+    import asyncio
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            response = await model.generate_content_async(
+                text,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=_build_response_schema(),
+                    temperature=0.1,
+                )
             )
-        )
 
-        data = json.loads(response.text)
-        return data
+            data = json.loads(response.text)
+            return data
 
-    except Exception as e:
-        print(f"Error calling Gemini API: {e}")
-        raise
+        except Exception as e:
+            if "429" in str(e) or "quota" in str(e).lower():
+                if attempt < max_retries - 1:
+                    print(f"Gemini API rate limit hit. Retrying in 40 seconds... (Attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(40)
+                    continue
+            print(f"Error calling Gemini API: {e}")
+            raise
 
 
 def _build_recommendation_schema() -> glm.Schema:
@@ -144,19 +152,27 @@ async def match_loan_schemes(metrics_dict: dict, risk_score_dict: dict, knowledg
     Output the top 3 recommended schemes as a JSON array.
     """
 
-    try:
-        response = await model.generate_content_async(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                response_schema=_build_recommendation_schema(),
-                temperature=0.2, # slight creativity for reasoning
+    import asyncio
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=_build_recommendation_schema(),
+                    temperature=0.2, # slight creativity for reasoning
+                )
             )
-        )
 
-        data = json.loads(response.text)
-        return data
+            data = json.loads(response.text)
+            return data
 
-    except Exception as e:
-        print(f"Error calling Gemini API for recommendations: {e}")
-        raise
+        except Exception as e:
+            if "429" in str(e) or "quota" in str(e).lower():
+                if attempt < max_retries - 1:
+                    print(f"Gemini API rate limit hit. Retrying in 40 seconds... (Attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(40)
+                    continue
+            print(f"Error calling Gemini API for recommendations: {e}")
+            raise

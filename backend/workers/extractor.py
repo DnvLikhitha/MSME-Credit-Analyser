@@ -26,30 +26,46 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-def extract_text_from_file(file_path: str, mime_type: str) -> str:
-    """Extracts text from a PDF or image file."""
+def extract_text_from_file(file_path: str, mime_type: str, password: str | None = None) -> str:
+    """Extracts text from a PDF or image file. Supports password-protected PDFs."""
     text = ""
     try:
         if mime_type == "application/pdf":
-            with pdfplumber.open(file_path) as pdf:
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-            
+            open_kwargs = {"password": password} if password else {}
+            try:
+                with pdfplumber.open(file_path, **open_kwargs) as pdf:
+                    for page in pdf.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+            except Exception as pdf_err:
+                err_type = type(pdf_err).__name__.lower()
+                err_msg = str(pdf_err).lower()
+                if (
+                    "password" in err_msg
+                    or "encrypted" in err_msg
+                    or "incorrect" in err_msg
+                    or "password" in err_type
+                    or "encrypt" in err_type
+                ):
+                    raise ValueError(
+                        "This PDF is password-protected. Please provide the correct PDF password when uploading."
+                    ) from pdf_err
+                raise
+
             # Fallback to OCR if PDF has no text (e.g., scanned PDF)
             # Not fully implemented here for brevity, but this is where it would go.
-            
+
         elif mime_type in ["image/jpeg", "image/png", "image/jpg"]:
             image = Image.open(file_path)
             text = pytesseract.image_to_string(image)
         else:
             logger.warning(f"Unsupported mime_type for extraction: {mime_type}")
-            
+
     except Exception as e:
         logger.error(f"Error extracting text from {file_path}: {e}")
         raise
-        
+
     return text
 
 
@@ -79,11 +95,17 @@ async def process_document(message: aio_pika.IncomingMessage):
                 try:
                     # 1. Extract text (Blocking I/O, ideally run in executor)
                     loop = asyncio.get_running_loop()
-                    text = await loop.run_in_executor(None, extract_text_from_file, doc.file_path, doc.mime_type)
+                    text = await loop.run_in_executor(
+                        None, extract_text_from_file, doc.file_path, doc.mime_type, doc.pdf_password
+                    )
                     
                     if not text.strip():
                         raise ValueError("No text could be extracted from the file.")
-                    
+
+                    # Clear the password from DB immediately after successful extraction
+                    if doc.pdf_password:
+                        doc.pdf_password = None
+                        db.commit()
                     # 2. Send to Gemini for structured extraction
                     logger.info(f"Extracted {len(text)} characters. Sending to Gemini...")
                     extracted_data_dict = await extract_financial_metrics_from_text(text)
@@ -129,7 +151,7 @@ async def process_document(message: aio_pika.IncomingMessage):
                 except Exception as e:
                     logger.error(f"Failed processing document {document_id}: {e}")
                     doc.status = "FAILED"
-                    doc.error_message = str(e)
+                    doc.error_message = str(e) or f"Processing failed: {type(e).__name__}"
                     db.commit()
 
         except Exception as e:

@@ -26,42 +26,50 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-bg" />
       <div className="auth-card fade-up">
-        <div className="auth-logo">
-          <span className="auth-logo-icon">⬡</span>
-          <h1 className="auth-title">MSME Credit AI</h1>
-          <p className="auth-subtitle">Sign in to your account</p>
+        
+        <div className="auth-header">
+          <div className="auth-logo">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 6l5 10H7l5-10z"/></svg>
+          </div>
+          <h1 className="auth-title">Welcome back</h1>
+          <p className="auth-subtitle">Log in to MSME Credit AI</p>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && <div className="alert-error">{error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">Email</label>
-            <input
-              id="email" type="email" className="form-input"
-              placeholder="you@example.com"
-              value={email} onChange={e => setEmail(e.target.value)} required
-            />
+          <div className="form-group floating">
+            <div className="floating-input-wrapper">
+              <label className="floating-label" htmlFor="email">Email</label>
+              <input
+                id="email" type="email" className="floating-input"
+                placeholder="you@example.com"
+                value={email} onChange={e => setEmail(e.target.value)} required
+              />
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">Password</label>
-            <input
-              id="password" type="password" className="form-input"
-              placeholder="••••••••"
-              value={password} onChange={e => setPassword(e.target.value)} required
-            />
+
+          <div className="form-group floating">
+            <div className="floating-input-wrapper">
+              <label className="floating-label" htmlFor="password">Password</label>
+              <input
+                id="password" type="password" className="floating-input"
+                placeholder="••••••••"
+                value={password} onChange={e => setPassword(e.target.value)} required
+              />
+            </div>
           </div>
-          <button type="submit" id="login-submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-            {loading ? <><span className="spinner" />Signing in...</> : 'Sign In'}
+
+          <button type="submit" className="btn-auth-primary" disabled={loading}>
+            {loading ? 'Logging in...' : 'Sign in to dashboard'}
           </button>
         </form>
 
         <p className="auth-footer">
-          Don't have an account?{' '}
-          <Link to="/register" className="auth-link">Create one</Link>
+          Don't have an account? <Link to="/register">Create one now</Link>
         </p>
+
       </div>
     </div>
   )

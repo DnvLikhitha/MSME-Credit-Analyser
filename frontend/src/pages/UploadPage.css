@@ -46,3 +46,25 @@
 }
 .type-option.selected .type-dot { background: var(--blue); border-color: var(--blue); }
 .upload-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+/* PDF Password field */
+.pdf-password-input {
+  width: 100%; padding: 10px 12px;
+  background: rgba(13,27,46,0.6); border: 1px solid var(--border);
+  border-radius: var(--r-sm); color: var(--text); font-size: 13.5px;
+  outline: none; transition: border-color 0.2s; box-sizing: border-box;
+}
+.pdf-password-input:focus { border-color: var(--blue); }
+.pdf-password-input::placeholder { color: var(--text-muted); }
+
+.optional-badge {
+  font-size: 11px; color: var(--text-muted); font-weight: 400;
+  background: rgba(255,255,255,0.06); border-radius: 4px;
+  padding: 1px 5px; margin-left: 4px; vertical-align: middle;
+}
+
+.password-hint {
+  font-size: 11.5px; color: var(--text-muted); line-height: 1.5;
+  margin-top: 6px; background: rgba(26,115,232,0.07);
+  border-left: 2px solid var(--blue); padding: 6px 10px; border-radius: 0 4px 4px 0;
+}

@@ -11,6 +11,7 @@ export default function UploadPage() {
   const fileRef  = useRef()
   const [file, setFile]         = useState(null)
   const [docType, setDocType]   = useState('BANK_STATEMENT')
+  const [pdfPassword, setPdfPassword] = useState('')
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError]       = useState('')
@@ -19,7 +20,7 @@ export default function UploadPage() {
     if (!f) return
     const valid = ['application/pdf','image/jpeg','image/png'].includes(f.type)
     if (!valid) { setError('Only PDF, JPEG, or PNG files are accepted.'); return }
-    setFile(f); setError('')
+    setFile(f); setPdfPassword(''); setError('')
   }
 
   const onDrop = (e) => {
@@ -32,6 +33,7 @@ export default function UploadPage() {
     const form = new FormData()
     form.append('file', file)
     form.append('document_type', docType)
+    if (pdfPassword) form.append('pdf_password', pdfPassword)
     setUploading(true); setError('')
     try {
       const { data } = await api.post('/documents/upload', form, {
@@ -97,6 +99,25 @@ export default function UploadPage() {
                 </label>
               ))}
             </div>
+
+            {/* PDF Password field — only shown for PDF files */}
+            {file && file.type === 'application/pdf' && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="pdf-password">
+                  PDF Password <span className="optional-badge">(if password-protected)</span>
+                </label>
+                <input
+                  id="pdf-password"
+                  type="password"
+                  className="pdf-password-input"
+                  placeholder="Enter PDF password…"
+                  value={pdfPassword}
+                  onChange={e => setPdfPassword(e.target.value)}
+                  autoComplete="off"
+                />
+                <p className="password-hint">💡 Common passwords: SBI / Axis / Kotak → PAN number · HDFC → Customer ID · ICICI → first 4 letters of name + DOB (DDMMYYYY)</p>
+              </div>
+            )}
 
             {error && <div className="alert alert-error">{error}</div>}
 

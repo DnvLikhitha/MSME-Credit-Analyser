@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   const fetchDocs = () => {
-    api.get('/documents/').then(r => setDocs(r.data)).finally(() => setLoading(false))
+    api.get('/documents/').then(r => setDocs(r.data.documents || [])).finally(() => setLoading(false))
   }
 
   useEffect(() => {

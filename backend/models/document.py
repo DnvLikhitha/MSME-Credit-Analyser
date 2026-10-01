@@ -43,6 +43,10 @@ class Document(Base):
     # Deduplication
     content_hash = Column(String(64), nullable=True, index=True)  # SHA-256 hex
 
+    # Optional PDF password for encrypted bank statement PDFs.
+    # Cleared after successful extraction — not stored long-term.
+    pdf_password = Column(String(255), nullable=True)
+
     # Processing state machine
     status = Column(String(20), default=DocumentStatus.PENDING, nullable=False)
     error_message = Column(Text, nullable=True)
