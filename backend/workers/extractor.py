@@ -19,8 +19,12 @@ from backend.models.extracted_metrics import ExtractedMetrics
 from backend.services.recommendation import generate_and_save_recommendations
 from backend.services.report import generate_and_save_report
 from backend.services.scoring import save_risk_score
+from backend.utils.bank_parser import parse_bank_statement_summary
+from backend.utils.cache import cache_document_status, connect_redis
+from backend.utils.encryption import decrypt_password
 from backend.utils.gemini import extract_financial_metrics_from_text
 from backend.utils.rabbitmq import DOCUMENT_PROCESSING_QUEUE
+from backend.utils.websocket_manager import ws_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -91,25 +95,38 @@ async def process_document(message: aio_pika.IncomingMessage):
                 # Update status to EXTRACTING
                 doc.status = "EXTRACTING"
                 db.commit()
+                doc_id_str = str(doc.id)
+                await cache_document_status(doc_id_str, "EXTRACTING")
+                await ws_manager.broadcast_status(doc_id_str, "EXTRACTING", "Extracting text and financial metrics...")
                 
                 try:
-                    # 1. Extract text (Blocking I/O, ideally run in executor)
+                    # 1. Decrypt password (if present) and extract text
+                    raw_password = decrypt_password(doc.pdf_password) if doc.pdf_password else None
+
                     loop = asyncio.get_running_loop()
                     text = await loop.run_in_executor(
-                        None, extract_text_from_file, doc.file_path, doc.mime_type, doc.pdf_password
+                        None, extract_text_from_file, doc.file_path, doc.mime_type, raw_password
                     )
                     
                     if not text.strip():
                         raise ValueError("No text could be extracted from the file.")
 
-                    # Clear the password from DB immediately after successful extraction
+                    # Clear the password from DB immediately after extraction
                     if doc.pdf_password:
                         doc.pdf_password = None
                         db.commit()
+
                     # 2. Send to Gemini for structured extraction
                     logger.info(f"Extracted {len(text)} characters. Sending to Gemini...")
                     extracted_data_dict = await extract_financial_metrics_from_text(text)
                     
+                    # Merge fallback metrics for any null fields if text contains bank statement summaries
+                    fallback_metrics = parse_bank_statement_summary(text)
+                    for key, val in fallback_metrics.items():
+                        if extracted_data_dict.get(key) is None and val is not None:
+                            extracted_data_dict[key] = val
+                            logger.info(f"Filled missing metric '{key}' with parsed fallback value: {val}")
+
                     # 3. Save extracted metrics to database
                     metrics = ExtractedMetrics(
                         document_id=doc.id,
@@ -120,6 +137,8 @@ async def process_document(message: aio_pika.IncomingMessage):
                     doc.status = "SCORING"
                     db.commit()
                     db.refresh(metrics)
+                    await cache_document_status(doc_id_str, "SCORING")
+                    await ws_manager.broadcast_status(doc_id_str, "SCORING", "Computing MSME credit risk score...")
 
                     logger.info(f"Extraction complete for {document_id}. Running risk scoring...")
 
@@ -132,13 +151,17 @@ async def process_document(message: aio_pika.IncomingMessage):
 
                     doc.status = "RECOMMENDING"
                     db.commit()
+                    await cache_document_status(doc_id_str, "RECOMMENDING")
+                    await ws_manager.broadcast_status(doc_id_str, "RECOMMENDING", "Retrieving matching government schemes via RAG...")
 
-                    # 5. Phase 4 — Run loan scheme matching immediately
+                    # 5. Phase 4 — Run loan scheme matching via Embedding RAG
                     logger.info(f"Running loan scheme recommendations for {document_id}...")
                     recs = await generate_and_save_recommendations(db, doc.id, metrics, risk_score)
 
                     doc.status = "REPORTING"
                     db.commit()
+                    await cache_document_status(doc_id_str, "REPORTING")
+                    await ws_manager.broadcast_status(doc_id_str, "REPORTING", "Generating comprehensive credit report PDF...")
 
                     # 6. Phase 5 — Generate PDF credit report
                     logger.info(f"Generating PDF report for {document_id}...")
@@ -146,13 +169,25 @@ async def process_document(message: aio_pika.IncomingMessage):
 
                     doc.status = "COMPLETE"
                     db.commit()
+                    await cache_document_status(doc_id_str, "COMPLETE")
+                    await ws_manager.broadcast_status(
+                        doc_id_str,
+                        "COMPLETE",
+                        "Credit assessment completed successfully!",
+                        extra={"risk_score": risk_score.overall_score, "risk_band": risk_score.risk_band},
+                    )
                     logger.info(f"Pipeline complete for {document_id}. Upload -> Extract -> Score -> Recommend -> Report. Done!")
                     
                 except Exception as e:
                     logger.error(f"Failed processing document {document_id}: {e}")
+                    # Ensure password is wiped even if processing fails
+                    if doc.pdf_password:
+                        doc.pdf_password = None
                     doc.status = "FAILED"
                     doc.error_message = str(e) or f"Processing failed: {type(e).__name__}"
                     db.commit()
+                    await cache_document_status(doc_id_str, "FAILED", error=doc.error_message)
+                    await ws_manager.broadcast_status(doc_id_str, "FAILED", f"Processing failed: {doc.error_message}")
 
         except Exception as e:
             logger.error(f"Message processing failed: {e}")
@@ -162,6 +197,9 @@ async def main():
     """Main worker loop to consume RabbitMQ messages."""
     logger.info("Starting MSME Extraction Worker...")
     
+    # Initialize Redis connection pool
+    await connect_redis()
+
     # Wait for RabbitMQ to be ready in Docker
     await asyncio.sleep(5)
     

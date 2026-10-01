@@ -93,10 +93,37 @@ export default function ResultsPage() {
 
   useEffect(() => {
     fetchAll()
+
+    // WebSocket real-time stage updates
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsHost = window.location.hostname || 'localhost'
+    const wsUrl = `${protocol}//${wsHost}:8000/documents/ws/${id}`
+    let ws = null
+
+    try {
+      ws = new WebSocket(wsUrl)
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.status) {
+            setDoc((prev) => prev ? { ...prev, status: data.status, error_message: data.error || prev.error_message } : prev)
+            fetchAll()
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Polling fallback
     const interval = setInterval(() => {
       if (doc && PROCESSING_STATUSES.includes(doc.status)) fetchAll()
     }, 4000)
-    return () => clearInterval(interval)
+
+    return () => {
+      clearInterval(interval)
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close()
+      }
+    }
   }, [id, doc?.status])
 
   const handleDownload = async () => {

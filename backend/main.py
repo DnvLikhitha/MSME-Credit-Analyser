@@ -7,6 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.database import engine
 from backend.utils.rabbitmq import connect_rabbitmq, close_rabbitmq
+from backend.utils.cache import connect_redis, close_redis, redis_health
+from backend.utils.limiter import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 # Import models so SQLAlchemy mapper knows about them (needed for ORM queries)
 from backend.models import (  # noqa: F401
@@ -26,8 +31,7 @@ async def lifespan(app: FastAPI):
     """
     Application startup / shutdown.
     Tables are created via SQL migration (infra/migrations/), not create_all().
-    Phase 2: will add RabbitMQ consumer startup.
-    Phase 6: will add Redis connection pool.
+    Initializes RabbitMQ and Redis connections.
     """
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.REPORTS_DIR, exist_ok=True)
@@ -35,11 +39,15 @@ async def lifespan(app: FastAPI):
     # Initialize RabbitMQ Publisher Connection
     await connect_rabbitmq()
     
+    # Initialize Redis Connection Pool
+    await connect_redis()
+    
     print(f"[*] MSME Credit Intelligence API - {settings.APP_ENV} | {settings.APP_HOST}:{settings.APP_PORT}")
     print(f"[*] Supabase: {settings.SUPABASE_URL or 'not configured'}")
     yield
     
     # Cleanup resources
+    await close_redis()
     await close_rabbitmq()
     print("[!] Application shutting down")
 
@@ -60,6 +68,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
@@ -85,11 +97,12 @@ def root():
         "status": "ok",
         "service": "MSME Credit Intelligence API",
         "version": "1.0.0",
-        "phase": "5 — PDF Report Generation",
+        "phase": "Enterprise Upgrades: RAG, Redis, WebSocket, RateLimiting, Encryption",
         "docs": "/docs",
     }
 
 
 @app.get("/health", tags=["Health"], summary="Health check")
-def health():
-    return {"status": "healthy", "env": settings.APP_ENV}
+async def health():
+    r_health = await redis_health()
+    return {"status": "healthy", "env": settings.APP_ENV, "redis": r_health}

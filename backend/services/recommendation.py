@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from backend.models.extracted_metrics import ExtractedMetrics
 from backend.models.loan_recommendation import LoanRecommendation
 from backend.models.risk_score import RiskScore
-from backend.services.schemes_knowledge import get_schemes_context
+from backend.services.rag_retrieval import retrieve_relevant_schemes
 from backend.utils.gemini import match_loan_schemes
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ async def generate_and_save_recommendations(
         "factors": risk_score.factor_breakdown,
     }
 
-    knowledge_base_str = get_schemes_context()
+    knowledge_base_str = retrieve_relevant_schemes(metrics_dict, risk_score_dict)
 
     # 2. Call Gemini for matching
     try:

@@ -28,6 +28,16 @@ services:
       - msme_postgres_data_v3:/var/lib/postgresql/data
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: msme_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
   msme_postgres_data_v3:
+  redis_data:

@@ -3,7 +3,7 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from backend.config import settings
@@ -12,7 +12,17 @@ from backend.models.document import Document, DocumentStatus, DocumentType
 from backend.models.user import User
 from backend.routers.auth import get_current_user
 from backend.schemas.document import DocumentListResponse, DocumentResponse, UploadResponse
+from backend.utils.cache import (
+    cache_document_status,
+    delete_content_hash,
+    get_cached_document_status,
+    invalidate_document_status,
+    set_content_hash,
+)
+from backend.utils.encryption import encrypt_password
+from backend.utils.limiter import limiter
 from backend.utils.rabbitmq import publish_document_processing_task
+from backend.utils.websocket_manager import ws_manager
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -44,7 +54,9 @@ def find_existing_document(db: Session, user_id, content_hash: str) -> Optional[
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/upload", response_model=UploadResponse, status_code=201)
+@limiter.limit("20/minute")
 async def upload_document(
+    request: Request,
     file: UploadFile = File(..., description="PDF, JPEG, or PNG financial document"),
     document_type: str = Form(
         default=DocumentType.OTHER,
@@ -63,8 +75,10 @@ async def upload_document(
     - Validates file type and size
     - Computes SHA-256 hash for deduplication (same file = returns cached record)
     - Saves file to UPLOAD_DIR
+    - Encrypts password using Fernet before storage
+    - Caches status in Redis
     - Creates a Document record with status=PENDING
-    - (Phase 2) Will enqueue an extraction job to RabbitMQ
+    - Enqueues an extraction job to RabbitMQ
     """
 
     # ── 1. Validate MIME type ─────────────────────────────────────────────────
@@ -105,7 +119,10 @@ async def upload_document(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # ── 5. Persist Document record ────────────────────────────────────────────
+    # ── 5. Encrypt password if provided ───────────────────────────────────────
+    encrypted_pwd = encrypt_password(pdf_password) if pdf_password else None
+
+    # ── 6. Persist Document record ────────────────────────────────────────────
     document = Document(
         user_id=current_user.id,
         filename=safe_filename,
@@ -116,14 +133,19 @@ async def upload_document(
         document_type=document_type,
         content_hash=content_hash,
         status=DocumentStatus.PENDING,
-        pdf_password=pdf_password or None,  # stored temporarily; cleared after extraction
+        pdf_password=encrypted_pwd,  # Fernet encrypted; cleared after extraction
     )
     db.add(document)
     db.commit()
     db.refresh(document)
 
+    # ── 7. Cache in Redis ─────────────────────────────────────────────────────
+    doc_id_str = str(document.id)
+    await cache_document_status(doc_id_str, DocumentStatus.PENDING)
+    await set_content_hash(content_hash, doc_id_str)
+
     # Publish task to RabbitMQ for async processing
-    await publish_document_processing_task(str(document.id))
+    await publish_document_processing_task(doc_id_str)
 
     return UploadResponse(
         document=document,
@@ -156,6 +178,37 @@ def list_documents(
     return {"documents": documents, "total": total}
 
 
+@router.get("/{document_id}/status")
+async def get_document_status(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get document processing status.
+    Checks Redis cache first (< 2ms response), falls back to database if cache miss.
+    """
+    cached = await get_cached_document_status(document_id)
+    if cached:
+        return {"document_id": document_id, **cached, "cached": True}
+
+    doc = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == current_user.id)
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    await cache_document_status(document_id, doc.status, doc.error_message)
+    return {
+        "document_id": document_id,
+        "status": doc.status,
+        "error": doc.error_message,
+        "cached": False,
+    }
+
+
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(
     document_id: str,
@@ -173,13 +226,31 @@ def get_document(
     return doc
 
 
+@router.websocket("/ws/{document_id}")
+async def websocket_document_stream(websocket: WebSocket, document_id: str):
+    """
+    WebSocket endpoint for real-time document processing stage push updates.
+    Client connects to: ws://<host>/documents/ws/{document_id}
+    """
+    await ws_manager.connect(websocket, document_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, document_id)
+    except Exception:
+        ws_manager.disconnect(websocket, document_id)
+
+
 @router.delete("/{document_id}", status_code=204)
-def delete_document(
+async def delete_document(
     document_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Delete a document and its associated file from disk."""
+    """Delete a document, cache entries, and its associated file from disk."""
     doc = (
         db.query(Document)
         .filter(Document.id == document_id, Document.user_id == current_user.id)
@@ -187,6 +258,11 @@ def delete_document(
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Invalidate Redis cache
+    await invalidate_document_status(document_id)
+    if doc.content_hash:
+        await delete_content_hash(doc.content_hash)
 
     # Remove file from disk
     if doc.file_path and os.path.exists(doc.file_path):

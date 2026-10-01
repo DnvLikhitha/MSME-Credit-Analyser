@@ -62,10 +62,10 @@ def _fmt_inr(value: Optional[float]) -> str:
     if value is None:
         return "—"
     if value >= 10_000_000:
-        return f"₹{value/10_000_000:.2f} Cr"
+        return f"Rs. {value/10_000_000:.2f} Cr"
     if value >= 100_000:
-        return f"₹{value/100_000:.2f} L"
-    return f"₹{value:,.0f}"
+        return f"Rs. {value/100_000:.2f} L"
+    return f"Rs. {value:,.0f}"
 
 
 def _fmt_pct(value: Optional[float]) -> str:
@@ -125,6 +125,7 @@ def _build_styles() -> dict:
         "score_big",
         fontName="Helvetica-Bold",
         fontSize=52,
+        leading=56,
         textColor=BRAND_NAVY,
         alignment=TA_CENTER,
     )
